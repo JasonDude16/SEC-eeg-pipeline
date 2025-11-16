@@ -1,0 +1,8 @@
+.Rhistory
+.Renviron
+.DS_Store
+report/
+venv/
+.Rproj.user
+__pycache__
+.ipynb_checkpoints
