@@ -1,3 +1,4 @@
+import mne
 import pandas as pd
 import warnings
 from numpy import floor, ceil
