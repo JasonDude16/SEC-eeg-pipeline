@@ -39,6 +39,7 @@ for f in all_fifs:
     df_ap_night['night'] = key
     
     df_all_night = pd.merge(df_feat_night, df_ap_night, how='outer')
+    df_all_night.insert(0, 'night', df_all_night.pop('night'))
     nights.append(df_all_night)
     
   df_all = pd.concat(nights)
