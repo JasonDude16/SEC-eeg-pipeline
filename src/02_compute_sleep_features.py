@@ -19,7 +19,7 @@ for f in all_fifs:
 
   subj = str(f).replace('_raw.fif.gz', '').split('/')[-1]
 
-  out_file = op.join(out_path, f'SEC_{subj}.csv')
+  out_file = op.join(out_path, f'{subj}.csv')
   if op.isfile(out_file):
     print(f'{subj} | files exist, skipping...') 
     continue
