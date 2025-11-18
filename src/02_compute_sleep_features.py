@@ -8,7 +8,7 @@ from src.util.process import split_raw_by_annotation
 from src.util.features import *
 
 fif_path = Path('/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/fif')
-out_path = '/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/csv'
+out_path = '/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/features'
 
 ##################################################################################
 
@@ -30,7 +30,7 @@ for f in all_fifs:
   nights = []
   for key,raw_night in raw_segments.items():
     
-    df_feat_night = yasa.compute_features_stage(raw_night.copy().pick('EEG'), hypno=raw_night['hypno'][0][0])
+    df_feat_night = yasa.compute_features_stage(raw_night.copy().pick('EEG'), hypno=raw_night['hypno'][0][0], do_1f=False)
     df_feat_night.reset_index(inplace=True)
     df_feat_night['night'] = key
     
