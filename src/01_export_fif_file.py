@@ -1,15 +1,14 @@
 import re
 import mne
-import yasa
 import pandas as pd
-from pathlib import Path
+from src.config import paths
 import os.path as op
-from src.util.process import add_night_annotations
+from src.util.process import add_night_annotations, align_hypnogram
 
 # setup
-edf_path = Path('/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/edf')
-hyp_path = Path('/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/hypnogram')
-fif_path = Path('/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/fif')
+edf_path = paths['edf']
+hyp_path = paths['hypnogram']
+fif_path = paths['fif']
 downsample_rate = 100
 low_freq_filt = 0.3
 high_freq_filt = 35
@@ -29,20 +28,30 @@ stage_map = {
 
 #  get list of all edfs
 all_edfs = sorted(edf_path.glob('*.edf'))
+if not all_edfs:
+    raise FileNotFoundError(f'No EDF files found in {edf_path}. Check config.toml or config.local.toml.')
+if not hyp_path.is_dir():
+    raise FileNotFoundError(f'Hypnogram directory not found: {hyp_path}')
+fif_path.mkdir(parents=True, exist_ok=True)
 
 for f in all_edfs:
 
     # get id, find associated hypnogram and epoch report
-    subj = re.search(r'_(\d+)_Export\.edf$', str(f)).group(1)
+    match = re.search(r'_(\d+)_Export\.edf$', f.name)
+    if match is None:
+        raise ValueError(f'Unexpected EDF filename: {f.name}. Expected <prefix>_<subject>_Export.edf.')
+    subj = match.group(1)
 
     # skip subject if fif file already exists
-    fif_file = list(fif_path.glob(subj + '*.fif.gz'))
-    fif_file = fif_file[0] if len(fif_file) else None
-    if fif_file is not None and reprocess is False:
+    fif_file = fif_path / f'SEC_{subj}_raw.fif.gz'
+    if fif_file.is_file() and reprocess is False:
         print(f"{subj} fif already exists and reprocess is set to False, skipping..")
         continue
 
-    hyp_file = list(hyp_path.glob('*' + subj + '*.csv'))
+    hyp_file = sorted(p for p in hyp_path.glob('*.csv')
+                      if re.search(r'(?<!\d)' + re.escape(subj) + r'(?!\d)', p.stem))
+    if len(hyp_file) > 1:
+        raise ValueError(f'{subj} | Multiple hypnograms found: {hyp_file}')
     hyp_file = hyp_file[0] if len(hyp_file) else None
 
     if hyp_file is None:
@@ -55,7 +64,9 @@ for f in all_edfs:
 
     df_hypno = pd.read_csv(hyp_file, index_col=False)
     df_hypno.PrimaryAutoStage = df_hypno.PrimaryAutoStage.map(stage_map)
-    hypno = yasa.hypno_upsample_to_data(df_hypno.PrimaryAutoStage, sf_hypno=1/30, sf_data=raw.info['sfreq'], data=raw)
+    if df_hypno.PrimaryAutoStage.isna().any():
+        raise ValueError(f'{subj} | Missing or unmapped PrimaryAutoStage values.')
+    hypno = align_hypnogram(df_hypno, raw.info['sfreq'], raw.n_times)
 
     info = mne.create_info(ch_names=['hypno'], ch_types=['misc'], sfreq=raw.info['sfreq'])
     hypno_arr = mne.io.RawArray([hypno], info, verbose=False)

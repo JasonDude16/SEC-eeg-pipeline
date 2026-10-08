@@ -3,21 +3,25 @@ import os
 import mne
 import yasa
 import os.path as op
-from pathlib import Path
+from src.config import paths
 from src.util.process import split_raw_by_annotation
-from src.util.features import *
+import pandas as pd
+from src.util.features import compute_aperiodics
 
-fif_path = Path('/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/fif')
-out_path = '/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/features'
+fif_path = paths['fif']
+out_path = paths['features']
 
 ##################################################################################
 
 # get all fif files
-all_fifs = sorted(fif_path.glob('*fif.gz'))
+all_fifs = sorted(fif_path.glob('*_raw.fif.gz'))
+if not all_fifs:
+  raise FileNotFoundError(f'No FIF files found in {fif_path}. Run the export step first.')
+out_path.mkdir(parents=True, exist_ok=True)
 
 for f in all_fifs:
 
-  subj = str(f).replace('_raw.fif.gz', '').split('/')[-1]
+  subj = f.name.replace('_raw.fif.gz', '')
 
   out_file = op.join(out_path, f'{subj}.csv')
   if op.isfile(out_file):
@@ -27,6 +31,9 @@ for f in all_fifs:
   raw = mne.io.read_raw_fif(f, preload=True)
   raw_segments = split_raw_by_annotation(raw, ann_text=['night_1', 'night_2', 'night_3'], epoch_length=30)
 
+  if not raw_segments:
+    raise ValueError(f'{subj} | No night annotations found.')
+
   nights = []
   for key,raw_night in raw_segments.items():
     
@@ -35,10 +42,10 @@ for f in all_fifs:
     df_feat_night['night'] = key
     
     df_ap_night = compute_aperiodics(raw_night, picks='EEG', stage_name='hypno', include_stages=[0,2,3,4])
-    df_ap_night['stage'] = df_ap_night['stage'].map({0: 'WN', 2: 'N2', 3: 'N3', 4: 'REM'})
+    df_ap_night['stage'] = df_ap_night['stage'].map({0: 'Wake', 2: 'N2', 3: 'N3', 4: 'REM'})
     df_ap_night['night'] = key
     
-    df_all_night = pd.merge(df_feat_night, df_ap_night, how='outer')
+    df_all_night = pd.merge(df_feat_night, df_ap_night, on=['stage', 'chan', 'night'], how='outer')
     df_all_night.insert(0, 'night', df_all_night.pop('night'))
     nights.append(df_all_night)
     

@@ -5,19 +5,20 @@ import nbformat
 import os.path as op
 from nbconvert import HTMLExporter
 from nbconvert.preprocessors import ExecutePreprocessor
-from pathlib import Path
+from src.config import repo_path, paths
 from src.util.process import split_raw_by_annotation
 
 # setup
-template_path = 'src/util/eeg_summary_template.ipynb'
-output_dir = 'report/eeg_summary'
-fif_path = Path('/Users/jasondude/Library/Mobile Documents/com~apple~CloudDocs/Desktop/SEC_EEG/fif')
+template_path = repo_path / 'src/util/eeg_summary_template.ipynb'
+output_dir = paths['reports']
+fif_path = paths['fif']
 
-if not op.exists(output_dir):
-  os.mkdir(output_dir)
+output_dir.mkdir(parents=True, exist_ok=True)
 
-files = sorted(fif_path.glob("*.fif.gz"))
-ids = [str(f).replace('_raw.fif.gz', '').split('/')[-1] for f in files]
+files = sorted(fif_path.glob("*_raw.fif.gz"))
+if not files:
+  raise FileNotFoundError(f'No FIF files found in {fif_path}. Run the export step first.')
+ids = [f.name.replace('_raw.fif.gz', '') for f in files]
 
 # set up dictionary of params to modify in notebook
 info = []
@@ -33,7 +34,10 @@ def replace_placeholders(notebook, subj):
     if cell.cell_type == 'markdown' or cell.cell_type == 'code':
       for k,v in subj.items():
         placeholder = f'{{{{{k}}}}}'
-        cell.source = cell.source.replace(placeholder, str(v))
+        if cell.cell_type == 'code':
+          cell.source = cell.source.replace(repr(placeholder), repr(str(v)))
+        else:
+          cell.source = cell.source.replace(placeholder, str(v))
   return notebook
 
 # generate notebook for each participant
@@ -42,14 +46,15 @@ def generate_report(template_path, info, output_dir):
     template_nb = nbformat.read(f, as_version=4)
   
   subj_nb = replace_placeholders(template_nb, info)
-  subj_nb_path = os.path.join(output_dir, f"SEC_{info['idx']}_report.ipynb")
+  subj_nb_path = os.path.join(output_dir, f"{info['idx']}_report.ipynb")
   
-  if os.path.exists(subj_nb_path):
-    return (f"SEC {info['idx']} already exists and reprocess=False, skipping...")
+  html_path = os.path.join(output_dir, f"{info['idx']}_report.html")
+  if os.path.exists(subj_nb_path) and os.path.exists(html_path):
+    return (f"{info['idx']} reports already exist, skipping...")
   
   # execute 
-  ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
-  ep.preprocess(subj_nb, {'metadata': {'path': './'}})
+  ep = ExecutePreprocessor(timeout=600, kernel_name='sec-eeg')
+  ep.preprocess(subj_nb, {'metadata': {'path': str(repo_path)}})
   
   # save
   with open(subj_nb_path, 'w', encoding='utf-8') as f:
@@ -58,11 +63,10 @@ def generate_report(template_path, info, output_dir):
   # convert to HTML
   html_exporter = HTMLExporter()
   body, _ = html_exporter.from_notebook_node(subj_nb)
-  html_path = os.path.join(output_dir, f"SEC_{info['idx']}_report.html")
   with open(html_path, 'w', encoding='utf-8') as f:
     f.write(body)
 
 for i in range(len(info)):
-  print(f"Generating report for SEC {info[i]['idx']}...")
-  generate_report(template_path, info[i], output_dir)
-  print('Done')
+  print(f"Generating report for {info[i]['idx']}...")
+  result = generate_report(template_path, info[i], output_dir)
+  print(result or 'Done')

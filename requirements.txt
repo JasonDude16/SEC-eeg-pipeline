@@ -1,5 +1,6 @@
+# Python 3.12. Versions from the original pipeline environment.
 antropy==0.1.9
-appnope==0.1.4
+appnope==0.1.4; sys_platform == "darwin"
 asttokens==3.0.1
 attrs==25.4.0
 beautifulsoup4==4.14.2

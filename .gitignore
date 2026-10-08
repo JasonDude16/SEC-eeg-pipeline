@@ -6,3 +6,5 @@ venv/
 .Rproj.user
 __pycache__
 .ipynb_checkpoints
+.venv/
+data/

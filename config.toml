@@ -1,0 +1,8 @@
+# Relative paths are resolved from the repository root.
+# Copy to config.local.toml for machine-specific paths (not tracked by Git).
+[paths]
+edf = "data/edf"
+hypnogram = "data/hypnogram"
+fif = "data/fif"
+features = "data/features"
+reports = "report/eeg_summary"

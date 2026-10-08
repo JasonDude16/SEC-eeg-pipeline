@@ -1,3 +1,4 @@
+import warnings
 import mne
 import yasa
 import fooof
@@ -129,7 +130,7 @@ def compute_aperiodics(raw, picks=None, stage_name=None, include_stages=None, fr
     df_psd = compute_psd(raw, picks, stage_name, include_stages)
 
     if df_psd is None:
-        return None
+        raise ValueError('No samples found for the requested aperiodic stages.')
 
     specparam_list = []
     for r in range(df_psd.shape[0]):
@@ -143,8 +144,11 @@ def compute_aperiodics(raw, picks=None, stage_name=None, include_stages=None, fr
             df_info['fooof_rsq'] = fm.get_params('r_squared')
             df_info['fooof_error'] = fm.get_params('error')
             specparam_list.append(df_info)
-        except:
-            pass
+        except Exception as exc:
+            warnings.warn(f'Aperiodic fit failed for {dict(df_info)}: {exc}')
+
+    if not specparam_list:
+        raise ValueError('All aperiodic fits failed; see warnings above.')
 
     df_specparam = pd.concat(specparam_list, axis=1).T
     df_psd.reset_index(inplace=True, drop=True)
